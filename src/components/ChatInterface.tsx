@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Character from './Character';
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 type Question = {
   id: number;
@@ -55,26 +56,74 @@ type ChatInterfaceProps = {
   onBack: () => void;
 };
 
+type SearchResult = {
+  content: string;
+  source?: string;
+};
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
 export default function ChatInterface({ character, onBack }: ChatInterfaceProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
   const [input, setInput] = useState('');
   const [currentOptions, setCurrentOptions] = useState<string[]>(CHAT_FLOW[0].options || []);
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleAnswer = (answer: string) => {
+  const handleAnswer = async (answer: string) => {
     const newAnswers = [...answers, answer];
     setAnswers(newAnswers);
 
     if (currentStep === 0) {
       setCurrentOptions(PREFECTURE_MAP[answer as keyof typeof PREFECTURE_MAP]);
     } else if (currentStep === 1) {
-      setCurrentOptions(['市区町村A', '市区町村B', '市区町村C']); // Example cities
+      setCurrentOptions(['市区町村A', '市区町村B', '市区町村C']);
     }
 
-    if (currentStep < CHAT_FLOW.length - 1) {
-      setCurrentStep(currentStep + 1);
+    if (currentStep === CHAT_FLOW.length - 1) {
+      await searchSupportInfo(newAnswers);
     } else {
-      console.log('Chat completed:', newAnswers);
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const searchSupportInfo = async (answers: string[]) => {
+    setIsSearching(true);
+    try {
+      const [region, prefecture, city, supportType, additionalInfo] = answers;
+      
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      const prompt = `
+        以下の条件に基づいて、ひとり親支援制度について具体的に説明してください：
+        
+        居住地域: ${prefecture}${city}
+        希望する支援制度: ${supportType}
+        追加情報: ${additionalInfo || 'なし'}
+        
+        回答は以下の形式でお願いします：
+        1. 制度の概要
+        2. 申請方法
+        3. 必要書類
+        4. 問い合わせ先
+      `;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      setSearchResult({
+        content: text,
+        source: '情報提供：各自治体公式サイト及びGemini AI'
+      });
+    } catch (error) {
+      console.error('検索エラー:', error);
+      setSearchResult({
+        content: '申し訳ありません。情報の取得に失敗しました。',
+      });
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -186,6 +235,43 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
               </li>
             ))}
           </ul>
+        </motion.div>
+      )}
+
+      {searchResult && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-8 bg-white/80 backdrop-blur-sm rounded-xl p-6 max-w-2xl mx-auto w-full"
+        >
+          <div className="flex items-start gap-6">
+            <Character 
+              type={character.id}
+              mood="happy"
+              className="w-32 h-32 flex-shrink-0"
+            />
+            <div className="chat-bubble relative bg-white rounded-2xl shadow-lg p-6 flex-1">
+              <div className="absolute -left-4 top-6 w-4 h-4 bg-white transform rotate-45" />
+              {isSearching ? (
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
+                </div>
+              ) : (
+                <>
+                  <div className="prose prose-blue">
+                    <p className="text-lg text-gray-800 whitespace-pre-wrap">
+                      {searchResult.content}
+                    </p>
+                  </div>
+                  {searchResult.source && (
+                    <p className="mt-4 text-sm text-gray-500">
+                      {searchResult.source}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </motion.div>
       )}
     </div>
