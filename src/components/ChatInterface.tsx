@@ -61,7 +61,7 @@ type SearchResult = {
   source?: string;
 };
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
 
 export default function ChatInterface({ character, onBack }: ChatInterfaceProps) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -91,9 +91,13 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
   const searchSupportInfo = async (answers: string[]) => {
     setIsSearching(true);
     try {
-      const [region, prefecture, city, supportType, additionalInfo] = answers;
-      
+      console.log('API接続テスト開始');
       const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      const testResult = await model.generateContent('こんにちは');
+      console.log('テスト応答:', await testResult.response.text());
+      
+      const [region, prefecture, city, supportType, additionalInfo] = answers;
       
       const prompt = `
         以下の条件に基づいて、ひとり親支援制度について具体的に説明してください：
@@ -248,7 +252,7 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
             <Character 
               type={character.id}
               mood="happy"
-              className="w-32 h-32 flex-shrink-0"
+              className="w-32 hh-32 flex-shrink-0"
             />
             <div className="chat-bubble relative bg-white rounded-2xl shadow-lg p-6 flex-1">
               <div className="absolute -left-4 top-6 w-4 h-4 bg-white transform rotate-45" />
