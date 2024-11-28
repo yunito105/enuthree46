@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Character from './Character';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { CITY_MAP } from '../data/cityData';
 
 type Question = {
   id: number;
@@ -63,6 +64,14 @@ type SearchResult = {
 
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
 
+// 背景画像のマッピングを追加
+const BACKGROUND_IMAGES = {
+  0: '/characters/parentsreading.png',
+  1: '/characters/parentsplaying.png',
+  2: '/characters/parentsraining.png',
+  3: '/characters/parentshappy.png',
+};
+
 export default function ChatInterface({ character, onBack }: ChatInterfaceProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -78,7 +87,10 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
     if (currentStep === 0) {
       setCurrentOptions(PREFECTURE_MAP[answer as keyof typeof PREFECTURE_MAP]);
     } else if (currentStep === 1) {
-      setCurrentOptions(['市区町村A', '市区町村B', '市区町村C']);
+      const cities = CITY_MAP[answer] || [];
+      setCurrentOptions(cities);
+    } else if (currentStep === 2) {
+      setCurrentOptions(CHAT_FLOW[3].options || []);
     }
 
     if (currentStep === CHAT_FLOW.length - 1) {
@@ -106,7 +118,7 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
         希望する支援制度: ${supportType}
         追加情報: ${additionalInfo || 'なし'}
         
-        回答は以下の形式でお願いします：
+        回答は以下の形式を図解して回答してください：
         1. 制度の概要
         2. 申請方法
         3. 必要書類
@@ -133,10 +145,23 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
 
   const handleBack = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      const newStep = currentStep - 1;
+      setCurrentStep(newStep);
+      
+      if (newStep === 0) {
+        setCurrentOptions(CHAT_FLOW[0].options || []);
+      } else if (newStep === 1) {
+        const region = answers[0];
+        setCurrentOptions(PREFECTURE_MAP[region as keyof typeof PREFECTURE_MAP]);
+      } else {
+        setCurrentOptions(CHAT_FLOW[newStep].options || []);
+      }
+      
       const newAnswers = [...answers];
       newAnswers.pop();
       setAnswers(newAnswers);
+      
+      setSearchResult(null);
     } else {
       onBack();
     }
@@ -152,6 +177,27 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
 
   return (
     <div className="max-w-6xl mx-auto px-4 pt-20 pb-4 min-h-[calc(100vh-5rem)] flex flex-col">
+      {/* 背景画像レイヤー */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 opacity-80" />
+        <img 
+          src={BACKGROUND_IMAGES[currentStep as keyof typeof BACKGROUND_IMAGES] || BACKGROUND_IMAGES[0]} 
+          alt="background" 
+          className="absolute bottom-[-55%] right-[-55%] w-[4000px] h-auto object-contain opacity-15 mix-blend-overlay"
+          style={{ transform: 'translateX(-30%) translateY(10%)' }}
+        />
+        
+        {/* 夢のような波アニメーション */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-200/20 via-pink-300/30 to-blue-200/20 animate-wave blur-3xl" />
+        </div>
+        
+        {/* 重なる波アニメーション */}
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-200/10 via-purple-300/20 to-pink-200/10 animate-wave-slow blur-2xl" />
+        </div>
+      </div>
+
       <motion.button
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
