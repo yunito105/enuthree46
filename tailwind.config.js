@@ -7,25 +7,46 @@ export default {
   theme: {
     extend: {
       animation: {
-        'wave': 'dreamWave 20s ease-in-out infinite',
-        'wave-slow': 'dreamWave 30s ease-in-out infinite',
-        'float': 'float 6s ease-in-out infinite',
+        'ripple': 'ripple 16s cubic-bezier(0.1, 0.5, 0.3, 1) forwards',
+        'bubble': 'bubble 20s ease-in-out infinite',
       },
       keyframes: {
-        dreamWave: {
-          '0%, 100%': { 
-            transform: 'translateX(-25%) translateY(5%) rotate(-2deg) scale(1.1)',
-            opacity: '0.3'
+        ripple: {
+          '0%': { 
+            transform: 'scale(0)',
+            opacity: 1
           },
-          '50%': { 
-            transform: 'translateX(25%) translateY(-5%) rotate(2deg) scale(1)',
-            opacity: '0.5'
+          '3%': {
+            transform: 'scale(0.1)',
+            opacity: 0.9
+          },
+          '20%': {
+            opacity: 0.7
+          },
+          '50%': {
+            opacity: 0.4
+          },
+          '100%': { 
+            transform: 'scale(1)',
+            opacity: 0
           }
         },
-        float: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-10px)' }
-        }
+        bubble: {
+          '0%': { 
+            transform: 'translateY(100vh) scale(0)',
+            opacity: 0 
+          },
+          '20%': { 
+            opacity: 0.8 
+          },
+          '80%': { 
+            opacity: 0.8 
+          },
+          '100%': { 
+            transform: 'translateY(-100vh) scale(1)',
+            opacity: 0 
+          }
+        },
       },
       fontFamily: {
         'sans': ['"Zen Maru Gothic"', 'Hiragino Maru Gothic ProN', 'sans-serif'],

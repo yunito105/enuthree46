@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Character from './Character';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { CITY_MAP } from '../data/cityData';
+import ResultPage from './ResultPage';
 
 type Question = {
   id: number;
@@ -72,6 +73,7 @@ const BACKGROUND_IMAGES = {
   3: '/characters/parentshappy.png',
 };
 
+
 export default function ChatInterface({ character, onBack }: ChatInterfaceProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<string[]>([]);
@@ -79,6 +81,13 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
   const [currentOptions, setCurrentOptions] = useState<string[]>(CHAT_FLOW[0].options || []);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [ripples, setRipples] = useState<Array<{ id: number; x: number; y: number }>>([]);
+  const [nextId, setNextId] = useState(0);
+  const [showResult, setShowResult] = useState(false);
+  const [selectedPrefecture, setSelectedPrefecture] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [selectedCity, setSelectedCity] = useState('');
+  const [selectedSystem, setSelectedSystem] = useState('');
 
   const handleAnswer = async (answer: string) => {
     const newAnswers = [...answers, answer];
@@ -133,6 +142,7 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
         content: text,
         source: '情報提供：各自治体公式サイト及びGemini AI'
       });
+      setShowResult(true);
     } catch (error) {
       console.error('検索エラー:', error);
       setSearchResult({
@@ -144,6 +154,10 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
   };
 
   const handleBack = () => {
+    if (showResult) {
+      setShowResult(false);
+      return;
+    }
     if (currentStep > 0) {
       const newStep = currentStep - 1;
       setCurrentStep(newStep);
@@ -175,155 +189,171 @@ export default function ChatInterface({ character, onBack }: ChatInterfaceProps)
 
   const currentQuestion = CHAT_FLOW[currentStep];
 
+  const addRipple = () => {
+    const x = 30 + Math.random() * 40;
+    const y = 30 + Math.random() * 40;
+    
+    setRipples(prev => [...prev, { id: nextId, x, y }]);
+    setNextId(prev => prev + 1);
+
+    setTimeout(() => {
+      setRipples(prev => prev.filter(ripple => ripple.id !== nextId));
+    }, 16000);
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (ripples.length < 3) {
+        addRipple();
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [ripples.length]);
+
   return (
-    <div className="max-w-6xl mx-auto px-4 pt-20 pb-4 min-h-[calc(100vh-5rem)] flex flex-col">
-      {/* 背景画像レイヤー */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 opacity-80" />
-        <img 
-          src={BACKGROUND_IMAGES[currentStep as keyof typeof BACKGROUND_IMAGES] || BACKGROUND_IMAGES[0]} 
-          alt="background" 
-          className="absolute bottom-[-55%] right-[-55%] w-[4000px] h-auto object-contain opacity-15 mix-blend-overlay"
-          style={{ transform: 'translateX(-30%) translateY(10%)' }}
+    <>
+      {showResult ? (
+        <ResultPage
+          character={character}
+          searchResult={searchResult!}
+          isSearching={isSearching}
+          onBack={handleBack}
         />
-        
-        {/* 夢のような波アニメーション */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-200/20 via-pink-300/30 to-blue-200/20 animate-wave blur-3xl" />
-        </div>
-        
-        {/* 重なる波アニメーション */}
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-200/10 via-purple-300/20 to-pink-200/10 animate-wave-slow blur-2xl" />
-        </div>
-      </div>
+      ) : (
+        <div className="min-h-screen relative overflow-hidden">
+          {/* 背景のベース色 */}
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 opacity-90" />
 
-      <motion.button
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        onClick={handleBack}
-        className="fixed top-20 left-4 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
-      >
-        <ArrowLeft className="w-6 h-6 text-gray-700" />
-      </motion.button>
-
-      <div className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto">
-        <div className="relative w-full">
-          <div className="flex items-start gap-6 mb-8">
-            <Character 
-              type={character.id}
-              mood={currentQuestion.allowFreeText ? 'listening' : 'thinking'} 
-              className="w-40 h-40 flex-shrink-0"
-            />
-            <div className="chat-bubble relative bg-white rounded-2xl shadow-lg p-6 flex-1 mt-4">
-              <div className="absolute -left-4 top-6 w-4 h-4 bg-white transform rotate-45" />
-              <p className="text-xl text-gray-800">
-                {currentQuestion.text}
-              </p>
-            </div>
+          {/* 波紋アニメーション */}
+          <div className="absolute inset-0 -z-10">
+            {ripples.map(ripple => (
+              <div
+                key={ripple.id}
+                className="absolute -translate-x-1/2 -translate-y-1/2"
+                style={{
+                  left: `${ripple.x}%`,
+                  top: `${ripple.y}%`,
+                }}
+              >
+                <div
+                  className="rounded-full animate-ripple"
+                  style={{
+                    width: '3000px',
+                    height: '3000px',
+                    background: `
+                      radial-gradient(circle, 
+                        rgba(125, 211, 252, 0.6) 0%,
+                        rgba(125, 211, 252, 0.45) 10%,
+                        rgba(125, 211, 252, 0.3) 20%,
+                        rgba(125, 211, 252, 0.2) 30%,
+                        rgba(125, 211, 252, 0.1) 40%,
+                        rgba(125, 211, 252, 0.05) 50%,
+                        transparent 70%
+                      )
+                    `,
+                    filter: 'blur(8px) contrast(1.2)',
+                    mixBlendMode: 'soft-light',
+                  }}
+                />
+              </div>
+            ))}
           </div>
 
-          <AnimatePresence mode="wait">
-            {currentQuestion.allowFreeText ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex gap-2"
-              >
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleFreeTextSubmit()}
-                  placeholder="こちらに入力してください..."
-                  className="flex-1 border rounded-lg px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={handleFreeTextSubmit}
-                  className="bg-blue-500 text-white px-8 py-4 rounded-lg text-lg hover:bg-blue-600 transition-colors"
-                >
-                  送信
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
-              >
-                {currentOptions.map((option, index) => (
-                  <motion.button
-                    key={option}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    onClick={() => handleAnswer(option)}
-                    className="w-full text-left px-6 py-4 text-lg border rounded-xl hover:bg-blue-50 hover:border-blue-500 transition-colors"
-                  >
-                    {option}
-                  </motion.button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
+          {/* メインコンテンツ */}
+          <div className="relative z-10 max-w-6xl mx-auto px-4 pt-20 pb-4 min-h-[calc(100vh-5rem)] flex flex-col">
+            <motion.button
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onClick={handleBack}
+              className="fixed top-20 left-4 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6 text-gray-700" />
+            </motion.button>
 
-      {answers.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 bg-white/80 backdrop-blur-sm rounded-xl p-6 max-w-2xl mx-auto w-full"
-        >
-          <h3 className="font-medium text-gray-700 mb-3 text-lg">これまでの回答:</h3>
-          <ul className="space-y-2">
-            {answers.map((answer, index) => (
-              <li key={index} className="text-gray-600">
-                {CHAT_FLOW[index].text}: <span className="font-medium">{answer}</span>
-              </li>
-            ))}
-          </ul>
-        </motion.div>
-      )}
-
-      {searchResult && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-8 bg-white/80 backdrop-blur-sm rounded-xl p-6 max-w-2xl mx-auto w-full"
-        >
-          <div className="flex items-start gap-6">
-            <Character 
-              type={character.id}
-              mood="happy"
-              className="w-32 hh-32 flex-shrink-0"
-            />
-            <div className="chat-bubble relative bg-white rounded-2xl shadow-lg p-6 flex-1">
-              <div className="absolute -left-4 top-6 w-4 h-4 bg-white transform rotate-45" />
-              {isSearching ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-                </div>
-              ) : (
-                <>
-                  <div className="prose prose-blue">
-                    <p className="text-lg text-gray-800 whitespace-pre-wrap">
-                      {searchResult.content}
+            <div className="flex-1 flex flex-col items-center justify-center w-full max-w-4xl mx-auto">
+              <div className="relative w-full">
+                <div className="flex items-start gap-6 mb-8">
+                  <Character 
+                    type={character.id}
+                    mood={currentQuestion.allowFreeText ? 'listening' : 'thinking'} 
+                    className="w-40 h-40 flex-shrink-0"
+                  />
+                  <div className="chat-bubble relative bg-white rounded-2xl shadow-lg p-6 flex-1 mt-4">
+                    <div className="absolute -left-4 top-6 w-4 h-4 bg-white transform rotate-45" />
+                    <p className="text-xl text-gray-800">
+                      {currentQuestion.text}
                     </p>
                   </div>
-                  {searchResult.source && (
-                    <p className="mt-4 text-sm text-gray-500">
-                      {searchResult.source}
-                    </p>
+                </div>
+
+                <AnimatePresence mode="wait">
+                  {currentQuestion.allowFreeText ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex gap-2"
+                    >
+                      <input
+                        type="text"
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleFreeTextSubmit()}
+                        placeholder="こちらに入力してください..."
+                        className="flex-1 border rounded-lg px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={handleFreeTextSubmit}
+                        className="bg-blue-500 text-white px-8 py-4 rounded-lg text-lg hover:bg-blue-600 transition-colors"
+                      >
+                        送信
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+                    >
+                      {currentOptions.map((option, index) => (
+                        <motion.button
+                          key={option}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
+                          onClick={() => handleAnswer(option)}
+                          className="w-full text-left px-6 py-4 text-lg border rounded-xl hover:bg-blue-50 hover:border-blue-500 transition-colors"
+                        >
+                          {option}
+                        </motion.button>
+                      ))}
+                    </motion.div>
                   )}
-                </>
-              )}
+                </AnimatePresence>
+              </div>
             </div>
+
+            {answers.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-8 bg-white/80 backdrop-blur-sm rounded-xl p-6 max-w-2xl mx-auto w-full"
+              >
+                <h3 className="font-medium text-gray-700 mb-3 text-lg">これまでの回答:</h3>
+                <ul className="space-y-2">
+                  {answers.map((answer, index) => (
+                    <li key={index} className="text-gray-600">
+                      {CHAT_FLOW[index].text}: <span className="font-medium">{answer}</span>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            )}
           </div>
-        </motion.div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
